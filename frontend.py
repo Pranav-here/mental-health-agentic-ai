@@ -14,4 +14,7 @@ if user_input:
     # Append user message
     st.session_state.chat_history.append({"role": "user", "content": user_input})
 
+    dummy_response = "I'm here for you. It's ok to feel this way, Would you like to talk more about it"
+    st.session_state.chat_history.append({"role": "assistant", "content": dummy_response})
+
 # Show response from the backend
