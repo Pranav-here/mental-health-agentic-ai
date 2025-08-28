@@ -1,5 +1,8 @@
 # Setup Streamlit
 import streamlit as st
+import requests
+
+BACKEND_URL="http://localhost:8000/ask"
 
 st.set_page_config(page_title="AI Therapist for Mental Health", layout='wide')
 st.title("Placeholder name")
@@ -15,8 +18,9 @@ if user_input:
     st.session_state.chat_history.append({"role": "user", "content": user_input})
     
     # AI agents will replace the dummy
-    dummy_response = "I'm here for you. It's ok to feel this way, Would you like to talk more about it"
-    st.session_state.chat_history.append({"role": "assistant", "content": dummy_response})
+    # dummy_response_from_backend = "I'm here for you. It's ok to feel this way, Would you like to talk more about it"
+    res=requests.post(BACKEND_URL, json={"message": user_input})
+    st.session_state.chat_history.append({"role": "assistant", "content": res.json()})
 
 # Show response from the backend
 for msg in st.session_state.chat_history:
