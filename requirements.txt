@@ -1,0 +1,7 @@
+streamlit
+fastapi
+uvicorn
+requests
+ollama
+duckduckgo-search
+twilio
