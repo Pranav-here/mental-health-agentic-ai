@@ -152,4 +152,4 @@ Built by **Pranav Kuchibhotla**. Low key links are in the UI. You can turn them 
 
 ## License
 
-MIT, or your choice. Replace this section if you need a different license.
+MIT
