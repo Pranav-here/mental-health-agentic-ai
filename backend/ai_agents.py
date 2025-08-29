@@ -1,102 +1,55 @@
-from langchain.agents import tool
-from tools import query_medgemma, call_emergency
+from typing import Tuple
+import re
+from tools import therapeutic_reply, place_emergency_call, find_therapists
 
+# Simple rule-based router. It is boring but stable and testable.
+# You can swap this for LangGraph later if you want tool learning.
 
-@tool
-def ask_mental_health_specialist(query: str) -> str:
+EMERGENCY_PATTERNS = [
+    r"\bkill myself\b", r"\bsuicide\b", r"\bself[-\s]?harm\b",
+    r"\bend it all\b", r"\bno reason to live\b"
+]
+THERAPIST_PATTERNS = [
+    r"\btherapist\b", r"\bcounsel(or|ling)\b", r"\bpsy(chologist|chiatrist)\b"
+]
+
+def classify_intent(text: str) -> str:
+    t = text.lower()
+    if any(re.search(p, t) for p in EMERGENCY_PATTERNS):
+        return "emergency"
+    if any(re.search(p, t) for p in THERAPIST_PATTERNS):
+        return "therapist_search"
+    return "support_chat"
+
+def run_engine(message: str) -> Tuple[str, str]:
     """
-        Generate a therapuetic response using the Medgemma model
-        use this for all general user queries, mental health questions, emotional concerns,
-        or to offer empathetic, evidence-based guidance in a conversational tone.
+    Route to the right tool and return (tool_called, response_text).
     """
-    return query_medgemma(query)
+    intent = classify_intent(message)
 
+    if intent == "emergency":
+        tool_used = "place_emergency_call"
+        # We do both: immediately recommend local services, and try a call if configured.
+        status = place_emergency_call("Triggered by urgent user message.")
+        reply = (
+            "I’m concerned for your safety. If you are in immediate danger, "
+            "call your local emergency number right now or go to the nearest ER. "
+            f"{status}"
+        )
+        return tool_used, reply
 
-@tool
-def emergency_call_tool(query: str) -> str:
-    """
-        Place an emergency call to the safety helpline's phone number via Twilio.
-        Use this only if the user expresses sucidal ideation, intent to self-harm,
-        or decribes a mental health emergency requireing immediate help.
-    """
-    return call_emergency(query)
+    if intent == "therapist_search":
+        tool_used = "find_therapists"
+        # Try to guess a location from the message, otherwise ask for one
+        m = re.search(r"in ([A-Za-z .,-]{2,})$", message.strip())
+        location = m.group(1).strip() if m else ""
+        if not location:
+            # Fallback wording if no location was detected
+            return tool_used, "Tell me a city or area and I’ll look up therapists near you."
+        listing = find_therapists(location)
+        return tool_used, listing
 
-
-@tool
-def find_nearby_therapists_by_location(location: str) -> str:
-    """
-    Finds and returns a list of licensed therapists near the specified location.
-
-    Args:
-        location (str): The name of the city or area in which the user is seeking therapy support.
-
-    Returns:
-        str: A newline-separated string containing therapist names and contact info.
-    """
-    return (
-        f"Here are some therapists near {location}, {location}:\n"
-        "- Dr. Ayesha Kapoor - +1 (555) 123-4567\n"
-        "- Dr. James Patel - +1 (555) 987-6543\n"
-        "- MindCare Counseling Center - +1 (555) 222-3333"
-    )
-
-# Setup AI agent and link to the backend
-from langchain_openai import ChatOpenAI
-from langgraph.prebuilt import create_react_agent
-from config import OPENAI_API_KEY
-
-tools = [ask_mental_health_specialist, emergency_call_tool, find_nearby_therapists_by_location]
-llm = ChatOpenAI(model="gpt-4", temperature=0.2, api_key=OPENAI_API_KEY)
-graph=create_react_agent(llm, tools=tools)
-
-SYSTEM_PROMPT = """
-You are an AI engine supporting mental health conversations with warmth and vigilance.
-You have access to three tools:
-
-1. `ask_mental_health_specialist`: Use this tool to answer all emotional or psychological queries with therapeutic guidance.
-2. `locate_therapist_tool`: Use this tool if the user asks about nearby therapists or if recommending local professional help would be beneficial.
-3. `emergency_call_tool`: Use this immediately if the user expresses suicidal thoughts, self-harm intentions, or is in crisis.
-
-Always take necessary action. Respond kindly, clearly, and supportively.
-"""
-
-def parse_response(stream):
-    tool_called_name = "None"
-    final_response = None
-
-    for s in stream:
-        # Check if a tool was called
-        tool_data = s.get('tools')
-        if tool_data:
-            tool_messages = tool_data.get('messages')
-            if tool_messages and isinstance(tool_messages, list):
-                for msg in tool_messages:
-                    tool_called_name = getattr(msg, 'name', 'None')
-
-        # Check if agent returned a message
-        agent_data = s.get('agent')
-        if agent_data:
-            messages = agent_data.get('messages')
-            if messages and isinstance(messages, list):
-                for msg in messages:
-                    if msg.content:
-                        final_response = msg.content
-
-    return tool_called_name, final_response
-
-
-"""
-Testing
-if __name__ == "__main__":
-    while True:
-        user_input = input("User: ")
-        print(f"Received user input: {user_input[:200]}...")
-        inputs = {"messages": [("system", SYSTEM_PROMPT), ("user", user_input)]}
-        stream = graph.stream(inputs, stream_mode="updates")
-        tool_called_name, final_response = parse_response(stream)
-        print("TOOL CALLED: ", tool_called_name)
-        print("ANSWER: ", final_response)
-        
-"""
-        
-
+    # Default to supportive chat
+    tool_used = "therapeutic_reply"
+    reply = therapeutic_reply(message)
+    return tool_used, reply
