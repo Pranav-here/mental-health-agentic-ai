@@ -1,61 +1,84 @@
-# Setup Ollama with Medgemma tool
-import ollama
+from typing import List
+from config import (
+    OPENAI_API_KEY, TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN,
+    TWILIO_FROM_NUMBER, EMERGENCY_CONTACT, OLLAMA_MODEL
+)
 
-def query_medgemma(prompt: str) -> str:
+# 1) Therapeutic reply via Ollama Med-Gemma (fallback safe message on error)
+def therapeutic_reply(user_text: str) -> str:
     """
-        Calls medgemma model with a therepist personality profile.
-        Returns  response as an emphetetic medical professional
+    Generate a warm, supportive reply for mental health conversations.
+    Uses an on-device Ollama model if available.
     """
-    system_prompt = """You are Dr. Pranav Kuchibhotla, a warm and experienced clinical psychologist. 
-    Respond to patients with:
-
-    1. Emotional attunement ("I can sense how difficult this must be...")
-    2. Gentle normalization ("Many people feel this way when...")
-    3. Practical guidance ("What sometimes helps is...")
-    4. Strengths-focused support ("I notice how you're...")
-
-    Key principles:
-    - Never use brackets or labels
-    - Blend elements seamlessly
-    - Vary sentence structure
-    - Use natural transitions
-    - Mirror the user's language level
-    - Always keep the conversation going by asking open ended questions to dive into the root cause of patients problem
-    """
-
     try:
-        response=ollama.chat(
-            model="alibayram/medgemma:4b",
+        import ollama  # requires `pip install ollama` and `ollama run <model>` once
+        system_prompt = (
+            "You are Dr. Riya Menon, a licensed clinical psychologist persona. "
+            "Be empathetic, supportive, and practical. Do not diagnose. "
+            "Invite gentle next steps and ask one open question to keep the user talking. "
+            "If the user describes imminent danger, advise calling local emergency services."
+        )
+        resp = ollama.chat(
+            model=OLLAMA_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt}
+                {"role": "user", "content": user_text},
             ],
-            options={
-                'num_predict': 350,  # Slightly higher for structural purposes
-                'temperature': 0.7,  # Balanced
-                'top_p': 0.9  # For diverse but relevent response
-            }
+            options={"num_predict": 300, "temperature": 0.7, "top_p": 0.9}
         )
-        return response['message']['content'].strip()
+        return resp["message"]["content"].strip()
+    except Exception:
+        return (
+            "I’m here with you. I can tell this matters a lot. "
+            "If you want, tell me a bit more about when these feelings get strongest, "
+            "and we can find one small step that might help."
+        )
+
+# 2) Emergency call via Twilio
+def place_emergency_call(note: str = "") -> str:
+    """
+    Trigger a phone call to your configured emergency contact.
+    Only call this when there is clear risk of harm.
+    """
+    if not all([TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, EMERGENCY_CONTACT]):
+        return "Emergency call not configured on the server."
+
+    try:
+        from twilio.rest import Client  # pip install twilio
+        client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+        call = client.calls.create(
+            to=EMERGENCY_CONTACT,
+            from_=TWILIO_FROM_NUMBER,
+            url="http://demo.twilio.com/docs/voice.xml"
+        )
+        return f"Emergency call triggered (sid: {call.sid})."
     except Exception as e:
-        return f"I'm having technical difficulties, but I want you to know your feeling matter. Please try again shortly."
+        return f"Failed to place emergency call: {e}"
 
+# 3) DuckDuckGo therapist search
+def find_therapists(location: str, limit: int = 5) -> str:
+    """
+    Look up nearby therapists using DuckDuckGo web search.
+    Returns a short, readable list of options.
+    """
+    query = f'therapist "{location}" site:psychologytoday.com OR site:betterhelp.com OR "counseling center" "{location}"'
+    try:
+        # pip install duckduckgo-search
+        from duckduckgo_search import DDGS
+        results = []
+        with DDGS() as ddgs:
+            for r in ddgs.text(query, max_results=limit):
+                title = r.get("title", "Result")
+                href = r.get("href") or r.get("url") or ""
+                source = r.get("source") or ""
+                results.append(f"- {title} ({source})\n  {href}")
 
-# print(query_medgemma(prompt="Hi. How are you?"))
-
-# Setup Twilio calling API tool
-from twilio.rest import Client
-from config import TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, EMERGENCY_CONTACT
-
-def call_emergency():
-    client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
-    call = client.calls.create(
-        to=EMERGENCY_CONTACT,
-        from_=TWILIO_FROM_NUMBER,
-        url="http://demo.twilio.com/docs/voice.xml" # can customize the message
-    )
-
-call_emergency()
-
-
-# Setup location tool
+        if not results:
+            return f"Could not find public listings for '{location}'. Try a nearby city name."
+        return f"Here are some options near {location}:\n" + "\n".join(results)
+    except Exception:
+        # Library missing or network blocked
+        return (
+            "Live search is not available on the server. "
+            "Try: Psychology Today directory, NAMI helpline, or your campus counseling center."
+        )
