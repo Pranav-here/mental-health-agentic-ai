@@ -1,0 +1,38 @@
+# syntax=docker/dockerfile:1
+
+# Small Python base
+FROM python:3.11-slim
+
+# Avoid .pyc, get realtime logs
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+# Basic build tools (some wheels need this), curl for quick checks
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Workdir inside the image
+WORKDIR /app
+
+# Install deps first for better layer caching
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt
+
+# Copy the rest of the app
+COPY . .
+
+# Optional, lets the Ollama client talk to a host daemon
+# On macOS or Windows this host name resolves to your machine
+# On Linux you may prefer --network=host or map port 11434
+ENV OLLAMA_HOST=http://host.docker.internal:11434
+
+# Streamlit will call the API on this URL (both run in one container)
+ENV BACKEND_URL=http://localhost:8000/ask
+
+# Open FastAPI (8000) and Streamlit (8501)
+EXPOSE 8000 8501
+
+# Start both processes, API in background, UI in foreground
+CMD ["/bin/sh","-c","uvicorn server:app --host 0.0.0.0 --port 8000 & streamlit run frontend.py --server.port 8501 --server.address 0.0.0.0"]
