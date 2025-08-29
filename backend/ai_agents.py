@@ -85,8 +85,8 @@ def parse_response(stream):
     return tool_called_name, final_response
 
 
-# """
-
+"""
+Testing
 if __name__ == "__main__":
     while True:
         user_input = input("User: ")
@@ -97,6 +97,6 @@ if __name__ == "__main__":
         print("TOOL CALLED: ", tool_called_name)
         print("ANSWER: ", final_response)
         
-# """
+"""
         
 
