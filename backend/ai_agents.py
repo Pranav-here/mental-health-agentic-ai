@@ -41,4 +41,13 @@ def find_nearby_therapists_by_location(location: str) -> str:
     )
 
 # Setup AI agent and link to the backend
+from langchain_openai import ChatOpenAI
+from langgraph.prebuilt import create_react_agent
+from config import OPENAI_API_KEY
+
+tools = [ask_mental_health_specialist, emergency_call_tool, find_nearby_therapists_by_location]
+llm = ChatOpenAI(model="gpt-4o-mini", temperature=0.2, api_key=OPENAI_API_KEY)
+graph=create_react_agent(llm, tools=tools)
+
+
 
