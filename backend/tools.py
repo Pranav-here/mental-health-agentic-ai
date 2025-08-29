@@ -44,4 +44,15 @@ def query_medgemma(prompt: str) -> str:
 # print(query_medgemma(prompt="Hi. How are you?"))
 
 # Setup Twilio calling API tool
+from twilio.rest import Client
+
+def call_emergency(user_number: str):
+    client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+    call = client.calls.create(
+        to=user_number,
+        from_=TWILIO_FROM_NUMBER,
+        url="http://demo.twilio.com/docs/voice.xml" # can customize the message
+    )
+
+
 # Setup location tool
