@@ -45,14 +45,17 @@ def query_medgemma(prompt: str) -> str:
 
 # Setup Twilio calling API tool
 from twilio.rest import Client
+from config import TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER, EMERGENCY_CONTACT
 
-def call_emergency(user_number: str):
+def call_emergency():
     client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
     call = client.calls.create(
-        to=user_number,
+        to=EMERGENCY_CONTACT,
         from_=TWILIO_FROM_NUMBER,
         url="http://demo.twilio.com/docs/voice.xml" # can customize the message
     )
+
+call_emergency()
 
 
 # Setup location tool
