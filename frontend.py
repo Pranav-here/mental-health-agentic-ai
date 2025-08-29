@@ -20,7 +20,7 @@ if user_input:
     # AI agents will replace the dummy
     # dummy_response_from_backend = "I'm here for you. It's ok to feel this way, Would you like to talk more about it"
     res=requests.post(BACKEND_URL, json={"message": user_input})
-    st.session_state.chat_history.append({"role": "assistant", "content": res.json()})
+    st.session_state.chat_history.append({"role": "assistant", "content": f'{res.json()["response"]} WITH TOOL: [{res.json()["tool_called"]}]'})
 
 # Show response from the backend
 for msg in st.session_state.chat_history:
