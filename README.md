@@ -1,4 +1,4 @@
-# CalmCurrent
+# CalmCurrent 
 
 A small, practical mental health support app with a Streamlit front end and a FastAPI backend. It offers supportive chat, a light therapist lookup, and an emergency call trigger that you must configure yourself. This is not medical advice.
 
